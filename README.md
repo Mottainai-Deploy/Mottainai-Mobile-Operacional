@@ -27,7 +27,7 @@ O Mottainai é um ecossistema anti-desperdício de alimentos. Este repositório 
 ```
 ┌─────────────────┐     ┌─────────────────┐
 │   🏪 Operacional │     │   🛍️ Cliente    │
-│   (este app)     │     │  (app do lojista)│
+│   (este app)     │     │  (app do cliente)│
 └────────┬────────┘     └────────┬────────┘
          │            Retrofit            │
          └──────────────┬─────────────────┘
@@ -48,7 +48,7 @@ O Mottainai é um ecossistema anti-desperdício de alimentos. Este repositório 
 - **API REST** → comunicação com o banco (PostgreSQL)
 - **Agentes IA** → motor preditivo, alertas e sugestões
 
-> 🔒 O app **nunca** acessa o banco diretamente. Tudo passa pela API REST.
+> O app utiliza APIs HTTP e serviços Firebase para autenticação, dados e notificações.
 
 ## 👥 Perfis de acesso
 
@@ -67,8 +67,8 @@ O perfil é detectado **automaticamente após o login** — não existe tela de 
 - 💔 **Avaria** — registro com motivo, quantidade e foto
 - 📋 **Inventário** — contagem física vs. sistema, com cálculo automático de divergência
 - ⚠️ **Alertas da IA** — níveis CRÍTICO / ATENÇÃO / MONITOR
-- 💡 **Sugestões da IA** — aprovadas ou recusadas pelo gerente
-- 🤖 **Chat com Agentes IA** — Agente Funcionário (estoque) e Agente Dono (KPIs)
+- 💡 **Sugestões da IA** — análise e decisão pelo gerente
+- 🤖 **Chat com IA** — envio de mensagens e histórico de conversas
 
 ## 🛠️ Stack técnica
 
@@ -80,7 +80,6 @@ O perfil é detectado **automaticamente após o login** — não existe tela de 
 | Rede | Retrofit 2 + OkHttp (interceptor de token JWT) |
 | Câmera | CameraX + ZXing |
 | Push | Firebase Cloud Messaging |
-| Localização por CEP | ViaCEP |
 | Catálogo por código de barras | Open Food Facts API |
 
 ## 🗂️ Estrutura de pastas
@@ -97,26 +96,26 @@ app/src/main/java/com/mottainai/operacional/
 └── utils/          → Constants, SessionManager...
 ```
 
-## 🔌 Endpoints principais
+## 🔌 Integrações e contratos
 
-```
-POST /auth/login                  → login (retorna token + role + storeId)
-GET  /auth/me                     → dados do usuário logado
-GET  /products?storeId=           → lista de produtos da loja
-POST /products                    → cadastrar produto (Gerente/Dono)
-GET  /products/expiring           → produtos próximos do vencimento
-POST /damages                     → registrar avaria
-GET  /alerts?storeId=             → alertas do Motor Preditivo
-GET  /suggestions?storeId=        → sugestões pendentes de aprovação
-PUT  /suggestions/{id}/approve    → aprovar sugestão
-PUT  /suggestions/{id}/reject     → recusar sugestão
-POST /chat                        → chat com agente IA
-```
+Os contratos HTTP consumidos pelo aplicativo estão em `network/ApiService.java` e `network/AiApiService.java`. As rotas incluem:
+
+| Área | Chamadas declaradas |
+|---|---|
+| Acesso e perfil | `POST api/v1/auth/login`, `POST api/v1/auth/refresh`, `GET api/v1/auth/profile` |
+| Produtos | `GET api/v1/products`, `GET api/v1/products/{id}`, `GET api/v1/products/barcode/{barcode}`, `POST api/v1/products`, `PUT api/v1/products/{id}` |
+| Avarias e estoque | `GET/POST api/v1/damages`, `GET api/v1/inventory`, `GET api/v1/batches` |
+| Inventário | `GET/POST api/v1/inventory-counts`, operações de itens e finalização em `api/v1/inventory-counts/{id}` |
+| Alertas e sugestões | `GET api/v1/alerts`, `GET api/v1/suggested-actions`, `POST api/v1/suggested-actions/{id}/decision` |
+| Indicadores | `GET api/v1/sales/summary` |
+| Assistente | `POST chat`, `GET chat/history/{sessionId}` na API da IA |
+
+O app também usa Firebase e integrações para notificações e imagens. Os serviços de destino precisam estar configurados no ambiente; consulte os arquivos de rede, os repositórios e a documentação de cada serviço para os contratos completos.
 
 ## 🚀 Como rodar
 
 1. Abra o projeto no **Android Studio** (JDK 17+)
-2. Synchronize o Gradle (`File → Sync Project with Gradle Files`)
+2. Sincronize o Gradle (`File → Sync Project with Gradle Files`)
 3. Para usar a API local no emulador, crie/edite `local.properties` (arquivo ignorado pelo Git):
    ```properties
    apiBaseUrl=http://10.0.2.2:8080/
@@ -127,6 +126,10 @@ POST /chat                        → chat com agente IA
    `-PreleaseIaBaseUrl=https://.../` no CI.
 4. Adicione o arquivo `google-services.json` do Firebase (para push)
 5. Rode em um emulador ou dispositivo físico
+
+## ✅ Testes e integração contínua
+
+Os testes locais estão em `app/src/test` e os instrumentados em `app/src/androidTest`. O workflow [CI](.github/workflows/ci.yml) descreve as verificações automatizadas. Para desenvolvimento, use as tarefas Gradle apropriadas ao ambiente e ao dispositivo ou emulador disponível.
 
 ## 🤝 Time
 
